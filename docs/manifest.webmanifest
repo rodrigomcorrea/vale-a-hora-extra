@@ -1,0 +1,14 @@
+{
+  "name": "Vale a hora extra?",
+  "short_name": "Hora Extra",
+  "description": "Marque os dias de hora extra e veja quanto sobra no holerite depois do INSS e do IR.",
+  "lang": "pt-BR",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#F2F4F8",
+  "theme_color": "#3341A6",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
