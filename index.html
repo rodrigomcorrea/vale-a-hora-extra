@@ -588,6 +588,7 @@ function pctSugerido(kind){
 const KIND_TXT = {feriado:"feriado", domingo:"domingo", sabado:"sábado de folga", folga:"dia de emenda (folga)", util:"dia útil, fora do expediente"};
 
 /* ===================== Cálculos ===================== */
+const SAL_MIN = 1621;
 function valorHora(){ const c=S.cfg; return c.modo==="hora" ? +c.valorHora||0 : (+c.salario||0)/(+c.divisor||220); }
 function salarioMensal(){ const c=S.cfg; return c.modo==="hora" ? (+c.valorHora||0)*(+c.divisor||220) : +c.salario||0; }
 
@@ -814,6 +815,7 @@ function renderCfgDyn(){
   $("hora-calc").textContent = valorHora()<=0 ? "Está no holerite como \"valor hora\" ou \"salário hora\"." : c.modo==="mensal"
     ? `Sua hora normal vale ${brl(valorHora())}.`
     : `Seu salário base fica em ${brl(salarioMensal())} por mês.`;
+  if(valorHora()>0 && salarioMensal()<SAL_MIN) $("hora-calc").textContent += ` Atenção: isso fica abaixo do salário mínimo (${brl(SAL_MIN)}). Confira o valor${c.modo==="hora"?" da hora no holerite":""}.`;
   $("custom-list").innerHTML = c.custom.length ? c.custom.map((f,i)=>{
     const {y,m,d}=parseIso(f.data);
     const quando = f.anual ? `${pad(d)}/${pad(m+1)} todo ano` : `${pad(d)}/${pad(m+1)}/${y}`;
@@ -1073,8 +1075,11 @@ function renderHol(){
   else if(ruins.length) reco=`<p class="reco">${ruins.length===1?"Um dia está":"Alguns dias estão"} em vermelho: com eles o salário passa de R$ 5.000 e entra na faixa em que o IR cresce mais rápido, porque além da alíquota maior a redução do imposto vai sumindo. Se for para cortar algum dia, comece por ${ruins.length===1?"ele":"eles"}.</p>`;
   else reco=`<p class="reco">Os dias em amarelo ainda deixam dinheiro, mas uma parte maior vai para o INSS e o IR. Vale fazer se você precisa do valor.</p>`;
   let dica="";
-  if(folgaIR>0){
-    const hb = folgaIR/fD;
+  // Pela CLT (art. 59) são até 2h extras por dia: 60h no mês já é bem mais do que se faz na prática
+  const hb = folgaIR/fD, hMax = hb/(vh*(1+cfg.pctDom/100));
+  if(folgaIR>0 && hMax>60){
+    dica=`<p class="reco small">Com o seu salário, as horas extras dificilmente vão te fazer pagar IR: faltam <b class="num">${brl0(folgaIR)}</b> até os R$ 5.000, mais do que se faz de extra num mês.</p>`;
+  } else if(folgaIR>0){
     dica=`<p class="reco small">Sem pagar IR, dá para fazer até <b class="num">${brl0(folgaIR)}</b> de extra bruto no mês (com DSR). Isso é por volta de <b>${fmtH(hb/(vh*(1+cfg.pctSab/100)))}</b> de hora extra a ${cfg.pctSab}% ou <b>${fmtH(hb/(vh*(1+cfg.pctDom/100)))}</b> a ${cfg.pctDom}%.</p>`;
   } else if(full.bruto<=TAB.redTeto){
     dica=`<p class="reco small">O salário sem extras já passa de R$ 5.000. Até R$ 7.350 o IR cresce rápido, porque a redução do imposto vai diminuindo.</p>`;
