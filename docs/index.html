@@ -174,6 +174,10 @@ table.mini td.num,table.mini th.num{text-align:right}
 .chip.warn{background:var(--warn);color:var(--surface)}
 .chip.bad{background:var(--bad);color:var(--surface)}
 .chip.none{background:var(--muted);color:var(--surface)}
+.chip.troca{background:var(--line);color:var(--ink)}
+.chip .al{margin-left:3px}
+.alertas{background:var(--bad-soft);color:var(--ink);border-radius:10px;padding:10px 12px;font-size:.85rem;margin:0;display:flex;flex-direction:column;gap:6px}
+.alertas b{color:var(--bad)}
 .chip .p{display:none}
 @media (min-width:560px){.chip .p{display:inline}}
 @media (max-width:420px){.day{min-height:60px;padding:4px}.day .tag{display:none}.day.k-fer::after,.day.k-duvida::after{content:"";position:absolute;top:6px;right:6px;width:6px;height:6px;border-radius:50%;background:var(--fer)}.day.k-duvida::after{background:var(--warn)}}
@@ -306,7 +310,18 @@ table.hol td.sub{color:var(--muted);font-size:.8rem}
         <div class="field">
           <label for="c-outrosProventos">Outros ganhos fixos no holerite (R$)</label>
           <input type="number" id="c-outrosProventos" data-k="outrosProventos" step="0.01" min="0" inputmode="decimal">
-          <span class="hint">Gratificação, insalubridade, adicional fixo. Entram no cálculo do INSS e do IR.</span>
+          <span class="hint">Gratificação, adicional fixo. Entram no cálculo do INSS e do IR. Insalubridade e periculosidade têm campo próprio abaixo.</span>
+        </div>
+        <div class="field">
+          <label for="c-adicional">Insalubridade ou periculosidade</label>
+          <select id="c-adicional" data-k="adicional">
+            <option value="">Não recebo</option>
+            <option value="ins10">Insalubridade grau mínimo (10% do salário mínimo)</option>
+            <option value="ins20">Insalubridade grau médio (20% do salário mínimo)</option>
+            <option value="ins40">Insalubridade grau máximo (40% do salário mínimo)</option>
+            <option value="peri">Periculosidade (30% do salário base)</option>
+          </select>
+          <span class="hint" id="adic-calc">Esses adicionais também aumentam o valor da hora extra (Súmulas 132 e 139 do TST).</span>
         </div>
       </div>
 
@@ -349,8 +364,21 @@ table.hol td.sub{color:var(--muted);font-size:.8rem}
         </div>
         <div class="field"><label for="c-adNot">Adicional noturno, das 22h às 5h (%)</label><input type="number" id="c-adNot" data-k="adNot" min="0" step="1"></div>
         <label class="check"><input type="checkbox" id="c-horaReduzida" data-k="horaReduzida"> <span>Contar a hora noturna como 52min30s (cada 7h de relógio viram 8h pagas)</span></label>
+        <label class="check"><input type="checkbox" id="c-prorrogNot" data-k="prorrogNot"> <span>Se eu trabalhar a noite toda (22h às 5h) e continuar depois, o adicional noturno segue valendo nas horas seguintes (Súmula 60 do TST)</span></label>
         <label class="check"><input type="checkbox" id="c-dsr" data-k="dsr"> <span>Incluir o reflexo das horas extras no DSR (descanso semanal remunerado)</span></label>
         <p class="law"><b>O que diz a lei:</b> hora extra vale no mínimo 50% a mais (Constituição, art. 7º, XVI). Domingo e feriado trabalhados sem folga compensatória pagam em dobro, ou seja, 100% (Súmula 146 do TST). Trabalho das 22h às 5h tem +20% e hora reduzida (CLT, art. 73). A convenção coletiva da sua categoria pode garantir percentuais maiores: confira no holerite ou com o sindicato.</p>
+      </div>
+
+      <div class="panel">
+        <h2>Regras da sua empresa (opcional)</h2>
+        <div class="field">
+          <label for="c-fechamento">Dia em que a empresa fecha o ponto</label>
+          <input type="number" id="c-fechamento" data-k="fechamento" min="0" max="28" step="1" inputmode="numeric" placeholder="Fim do mês">
+          <span class="hint" id="fech-calc">Deixe em branco se o holerite conta o mês inteiro, do dia 1 ao último dia. Se fecha, por exemplo, no dia 20, a extra do dia 21 em diante só entra no holerite seguinte.</span>
+        </div>
+        <label class="check"><input type="checkbox" id="c-bancoHoras" data-k="bancoHoras"> <span>A empresa usa banco de horas</span></label>
+        <span class="hint small muted">Com banco de horas, a extra pode virar folga em vez de dinheiro. O site continua mostrando quanto ela valeria se fosse paga.</span>
+        <p class="law"><b>Faltas e folga em troca:</b> no calendário, ao tocar num dia útil dá para marcar uma falta sem atestado, que desconta o dia e o DSR da semana. Num domingo ou feriado trabalhado, dá para dizer que vai ganhar folga em troca; aí o dia não paga em dobro.</p>
       </div>
 
       <div class="panel">
@@ -431,7 +459,7 @@ table.hol td.sub{color:var(--muted);font-size:.8rem}
       <div class="stack">
         <div class="panel" id="hol-reco"></div>
         <div class="panel" id="hol-meter"></div>
-        <p class="fine">Esta é uma estimativa. Não considera faltas, atrasos, adiantamento quinzenal, banco de horas, 13º, férias nem regras próprias da sua convenção coletiva. Se a sua empresa fecha o ponto em outro dia do mês (por exemplo, do dia 21 ao 20), as horas podem cair em outro holerite.</p>
+        <p class="fine">Esta é uma estimativa. Não considera atrasos, adiantamento quinzenal, 13º, férias nem regras próprias da sua convenção coletiva. Se a sua empresa fecha o ponto em outro dia do mês (por exemplo, do dia 21 ao 20), informe esse dia em Configuração.</p>
       </div>
     </div>
   </section>
@@ -492,7 +520,8 @@ const DOW_CURTO = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
 const DEF = {
   modo:"hora", salario:0, valorHora:0, divisor:220, outrosProventos:0,
   uf:"", cidade:"", sabadoUtil:false, iniJornada:"08:00", fimJornada:"17:00", iniFds:"08:00", fimFds:"14:00",
-  pctUtil:50, pctSab:50, pctDom:100, pctFer:100, adNot:20, horaReduzida:true, dsr:true,
+  pctUtil:50, pctSab:50, pctDom:100, pctFer:100, adNot:20, horaReduzida:true, prorrogNot:true, dsr:true,
+  adicional:"", fechamento:0, bancoHoras:false,
   dependentes:0, pensao:0, vt:false, vtCusto:0, plano:0,
   descontosExtras:[], custom:[], exemplo:true
 };
@@ -611,27 +640,51 @@ const KIND_TXT = {feriado:"feriado", domingo:"domingo", sabado:"sábado de folga
 const SAL_MIN = 1621;
 function valorHora(){ const c=S.cfg; return c.modo==="hora" ? +c.valorHora||0 : (+c.salario||0)/(+c.divisor||220); }
 function salarioMensal(){ const c=S.cfg; return c.modo==="hora" ? (+c.valorHora||0)*(+c.divisor||220) : +c.salario||0; }
+const ADIC = {ins10:["Insalubridade 10%",.10,"min"], ins20:["Insalubridade 20%",.20,"min"], ins40:["Insalubridade 40%",.40,"min"], peri:["Periculosidade 30%",.30,"sal"]};
+function adicionalMensal(){ const a=ADIC[S.cfg.adicional]; if(!a || salarioMensal()<=0) return 0; return a[1]*(a[2]==="min" ? SAL_MIN : salarioMensal()); }
+/* Hora usada para a hora extra: salário + insalubridade/periculosidade (Súmulas 132, 139 e 264 do TST) */
+function valorHoraHE(){ const vh=valorHora(); return vh>0 ? vh + adicionalMensal()/(+S.cfg.divisor||220) : 0; }
+
+/* Período que entra no holerite do mês m: o mês cheio, ou do dia seguinte ao fechamento no mês anterior até o dia do fechamento */
+function periodo(y,m){
+  const f=+S.cfg.fechamento||0, dias=[];
+  if(!f){ for(let dd=1; dd<=diasNoMes(y,m); dd++) dias.push(iso(y,m,dd)); return dias; }
+  let ini=addDias(new Date(Date.UTC(y,m-1,Math.min(f,diasNoMes(y,(m+11)%12)))),1);
+  const fim=new Date(Date.UTC(y,m,Math.min(f,diasNoMes(y,m))));
+  for(let dt=ini; dt<=fim; dt=addDias(dt,1)) dias.push(isoDt(dt));
+  return dias;
+}
+/* Mês do holerite em que o dia entra */
+function folhaDe(d){
+  const {y,m,d:dd}=parseIso(d), f=+S.cfg.fechamento||0;
+  if(!f || dd<=Math.min(f,diasNoMes(y,m))) return {y,m};
+  return m===11 ? {y:y+1,m:0} : {y,m:m+1};
+}
+const fmtCurta = d => { const {m,d:dd}=parseIso(d); return `${pad(dd)}/${pad(m+1)}`; };
+function rotuloPeriodo(y,m){ if(!+S.cfg.fechamento) return `${MESES[m]}/${y}`; const p=periodo(y,m); return `${fmtCurta(p[0])} a ${fmtCurta(p[p.length-1])}`; }
 
 function calcINSS(b){ let t=0, prev=0; for(const [lim,a] of TAB.inss){ if(b>prev) t+=(Math.min(b,lim)-prev)*a; prev=lim; } return t; }
 function calcIRTabela(base){ for(const [lim,a,d] of TAB.ir) if(base<=lim) return Math.max(0, base*a-d); return 0; }
 
-function folha(he, dsr){
-  const c=S.cfg, sal=salarioMensal();
-  const bruto = sal + (+c.outrosProventos||0) + he + dsr;
-  const inss = calcINSS(bruto);
-  const legal = bruto - inss - (+c.dependentes||0)*TAB.dep - (+c.pensao||0);
-  const simp = bruto - TAB.simp;
+function folha(he, dsr, faltas=0){
+  const c=S.cfg, sal=salarioMensal(), adic=adicionalMensal();
+  const bruto = sal + adic + (+c.outrosProventos||0) + he + dsr;
+  // Faltas saem da base do INSS e do IR
+  const trib = Math.max(0, bruto - faltas);
+  const inss = calcINSS(trib);
+  const legal = trib - inss - (+c.dependentes||0)*TAB.dep - (+c.pensao||0);
+  const simp = trib - TAB.simp;
   const usaSimp = simp < legal;
   const base = Math.max(0, Math.min(legal, simp));
   const irBruto = calcIRTabela(base);
   let red = 0;
-  if(bruto <= TAB.isento) red = Math.min(irBruto, TAB.redMax);
-  else if(bruto <= TAB.redTeto) red = Math.min(irBruto, Math.max(0, TAB.redA - TAB.redB*bruto));
+  if(trib <= TAB.isento) red = Math.min(irBruto, TAB.redMax);
+  else if(trib <= TAB.redTeto) red = Math.min(irBruto, Math.max(0, TAB.redA - TAB.redB*trib));
   const ir = irBruto - red;
   const vt = c.vt ? Math.min(sal*0.06, +c.vtCusto||0) : 0;
   const outros = (+c.plano||0) + (+c.pensao||0) + c.descontosExtras.reduce((s,x)=>s+(+x.valor||0),0);
-  const desc = inss + ir + vt + outros;
-  return {sal, bruto, inss, base, usaSimp, irBruto, red, ir, vt, desc, liquido: bruto-desc};
+  const desc = faltas + inss + ir + vt + outros;
+  return {sal, adic, bruto, trib, faltas, inss, base, usaSimp, irBruto, red, ir, vt, desc, liquido: bruto-desc};
 }
 
 /* Trechos de hora extra do dia, em minutos. Dia útil: o que passa antes da entrada e depois da saída do expediente. */
@@ -658,6 +711,8 @@ function horasDoTurno(p, kind){
     if(tipo==="antes") antes+=b-a;
     if(tipo==="depois") depois+=b-a;
     for(const [s,e] of [[0,300],[1320,1740],[2760,3180]]) noite += Math.max(0, Math.min(b,e)-Math.max(a,s));
+    // Súmula 60, II: noite inteira trabalhada e prorrogada, as horas seguintes também são noturnas
+    if(S.cfg.prorrogNot && a<=1320 && b>1740) noite += b-1740 - Math.max(0, Math.min(b,3180)-2760);
   }
   let dia=total-noite;
   const pausa=Math.min(Math.max(0,+p.pausa||0), total);
@@ -666,9 +721,11 @@ function horasDoTurno(p, kind){
 }
 
 function valorDoDia(d){
-  const p=S.plan[d]; if(!p||!p.on) return null;
-  const t=tipoDia(d), h=horasDoTurno(p, t.kind); if(!h || h.relogio<=0) return null;
-  const c=S.cfg, vh=valorHora();
+  const p=S.plan[d]; if(!p||!p.on||p.falta) return null;
+  const t=tipoDia(d);
+  if(p.comp && podeTrocar(t.kind)) return null;
+  const h=horasDoTurno(p, t.kind); if(!h || h.relogio<=0) return null;
+  const c=S.cfg, vh=valorHoraHE();
   const sug=pctSugerido(t.kind);
   const pct = (p.pct==null || p.pct==="") ? sug : +p.pct;
   const fatorN = c.horaReduzida ? 60/52.5 : 1;
@@ -678,19 +735,27 @@ function valorDoDia(d){
   return {d, t, h, pct, sug, noitePaga, vDia, vNoite, valor:vDia+vNoite};
 }
 
+const podeTrocar = kind => kind==="domingo" || kind==="feriado";
+/* Falta sem justificativa: desconta o dia e o DSR da semana (Lei 605/49, art. 6º) */
+const semanaDe = d => { const {y,m,d:dd}=parseIso(d); return isoDt(addDias(new Date(Date.UTC(y,m,dd)), -dowOf(y,m,dd))); };
+
 function calcMes(y,m){
-  const n=diasNoMes(y,m); let uteis=0, descansos=0; const itens=[];
-  for(let dd=1; dd<=n; dd++){
-    const d=iso(y,m,dd), t=tipoDia(d);
+  const dias=periodo(y,m); let uteis=0, descansos=0, nFaltas=0; const itens=[], semFalta=new Set();
+  for(const d of dias){
+    const t=tipoDia(d);
     if(t.kind==="domingo"||t.kind==="feriado") descansos++; else uteis++;
+    if((S.plan[d]||{}).falta && t.kind==="util"){ nFaltas++; semFalta.add(semanaDe(d)); continue; }
     const v=valorDoDia(d); if(v) itens.push(v);
   }
   const fDSR = S.cfg.dsr && uteis ? descansos/uteis : 0;
+  const diaria = (salarioMensal()+adicionalMensal())/30;
+  const faltas = {dias:nFaltas, semanas:semFalta.size, vDias:nFaltas*diaria, vDsr:semFalta.size*diaria};
+  const vf = faltas.vDias+faltas.vDsr;
   const he = itens.reduce((s,i)=>s+i.valor,0);
-  const base = folha(0,0), full = folha(he, he*fDSR);
+  const base = folha(0,0,vf), full = folha(he, he*fDSR, vf);
   itens.forEach(it=>{
     const sem = he - it.valor;
-    const fs = folha(sem, sem*fDSR);
+    const fs = folha(sem, sem*fDSR, vf);
     it.bruto = it.valor*(1+fDSR);
     it.liq = full.liquido - fs.liquido;
     it.ret = it.bruto>0 ? it.liq/it.bruto : 1;
@@ -698,8 +763,53 @@ function calcMes(y,m){
   });
   // quanto sobraria de mais R$ 100 de extra
   const x = 100/(1+fDSR);
-  const prox = folha(he+x,(he+x)*fDSR).liquido - full.liquido;
-  return {y,m,uteis,descansos,fDSR,he,dsr:he*fDSR,itens,base,full,prox,horas:itens.reduce((s,i)=>s+i.h.relogio,0)};
+  const prox = folha(he+x,(he+x)*fDSR,vf).liquido - full.liquido;
+  const fgts = .08*(he+he*fDSR);
+  return {y,m,dias,uteis,descansos,fDSR,he,dsr:he*fDSR,itens,faltas,fgts,base,full,prox,horas:itens.reduce((s,i)=>s+i.h.relogio,0)};
+}
+/* Dias marcados do mês que está na tela: com fechamento, o fim do mês já cai no holerite seguinte */
+function porDiaVisivel(y,m){
+  const r={}, ms=[[y,m]];
+  if(+S.cfg.fechamento) ms.push(m===11 ? [y+1,0] : [y,m+1]);
+  ms.forEach(([yy,mm])=>calcMes(yy,mm).itens.forEach(i=>{ r[i.d]=i; }));
+  return r;
+}
+function calcDoDia(d){ const {y,m}=folhaDe(d); return calcMes(y,m); }
+
+/* Começo e fim do trabalho no dia, em minutos a partir da meia-noite daquele dia */
+function jornadaDoDia(d){
+  const p=S.plan[d]||{}, t=tipoDia(d), c=S.cfg;
+  if(p.falta) return null;
+  if(t.kind==="util"){
+    let a=toMin(c.iniJornada), b=toMin(c.fimJornada); if(a==null||b==null) return null;
+    if(b<=a) b+=1440;
+    if(p.on){ const e=toMin(p.ent); let s=toMin(p.sai); if(e!=null&&s!=null){ if(s<a) s+=1440; a=Math.min(a,e); b=Math.max(b,s); } }
+    return [a,b];
+  }
+  if(!p.on) return null;
+  const a=toMin(p.ini), b=toMin(p.fim); if(a==null||b==null) return null;
+  return [a, b<=a ? b+1440 : b];
+}
+/* Avisos de limites da CLT para um dia marcado */
+function avisosDia(d){
+  const p=S.plan[d]||{}; if(!p.on || p.falta) return [];
+  const t=tipoDia(d), out=[];
+  const h=horasDoTurno(p, t.kind);
+  if(h){
+    if(t.kind==="util" && h.antes+h.depois>2) out.push(`São <b>${fmtH(h.antes+h.depois)}</b> de extra no dia. A CLT permite no máximo 2h extras por dia (art. 59).`);
+    if(t.kind!=="util" && h.relogio>10) out.push(`São <b>${fmtH(h.relogio)}</b> de trabalho no dia. Passa de 10h, o máximo de 8h normais mais 2h extras (CLT, art. 59).`);
+  }
+  const {y,m,d:dd}=parseIso(d), dt=new Date(Date.UTC(y,m,dd));
+  const j=jornadaDoDia(d);
+  if(j){
+    const ant=jornadaDoDia(isoDt(addDias(dt,-1))), prx=jornadaDoDia(isoDt(addDias(dt,1)));
+    if(ant && j[0]-(ant[1]-1440)<660) out.push(`Entre a saída do dia anterior e a entrada deste ficam só <b>${fmtH((j[0]-(ant[1]-1440))/60)}</b>. A lei pede pelo menos 11h de descanso (CLT, art. 66).`);
+    if(prx && (prx[0]+1440)-j[1]<660) out.push(`Entre a saída deste dia e a entrada do dia seguinte ficam só <b>${fmtH(((prx[0]+1440)-j[1])/60)}</b>. A lei pede pelo menos 11h de descanso (CLT, art. 66).`);
+  }
+  const dom=addDias(dt,-dowOf(y,m,dd));
+  let trab=0; for(let i=0;i<7;i++) if(jornadaDoDia(isoDt(addDias(dom,i)))) trab++;
+  if(trab===7) out.push(`Com este dia você trabalha <b>os 7 dias da semana</b>. A lei garante uma folga de 24h seguidas por semana (CLT, art. 67).`);
+  return out;
 }
 function veredito(r){ return r>=.70 ? "good" : r>=.55 ? "warn" : "bad"; }
 const VERD_TXT = {good:"Vale a pena", warn:"Rende menos", bad:"Imposto come muito", none:"Falta o valor da hora"};
@@ -742,6 +852,7 @@ function initCfg(){
       let val;
       if(el.type==="checkbox") val=el.checked;
       else if(el.type==="number") val = el.value==="" ? 0 : parseFloat(el.value);
+      if(k==="fechamento") val = Math.max(0, Math.min(28, Math.round(val)||0));
       else if(k==="divisor") val=+el.value;
       else val=el.value;
       S.cfg[k]=val; S.cfg.exemplo=false;
@@ -777,7 +888,7 @@ function preencherCfg(){
   document.querySelectorAll("[data-k]").forEach(el=>{
     const k=el.dataset.k, v=S.cfg[k];
     if(el.type==="checkbox") el.checked=!!v;
-    else el.value = (["salario","valorHora","vtCusto"].includes(k) && !v) ? "" : v;
+    else el.value = (["salario","valorHora","vtCusto","fechamento"].includes(k) && !v) ? "" : v;
   });
   fillCidades(); renderDesc();
 }
@@ -836,6 +947,12 @@ function renderCfgDyn(){
     ? `Sua hora normal vale ${brl(valorHora())}.`
     : `Seu salário base fica em ${brl(salarioMensal())} por mês.`;
   if(valorHora()>0 && salarioMensal()<SAL_MIN) $("hora-calc").textContent += ` Atenção: isso fica abaixo do salário mínimo (${brl(SAL_MIN)}). Confira o valor${c.modo==="hora"?" da hora no holerite":""}.`;
+  $("adic-calc").textContent = adicionalMensal()
+    ? `${brl(adicionalMensal())} por mês. Sua hora extra passa a ser calculada sobre ${brl(valorHoraHE())} por hora (Súmulas 132 e 139 do TST).`
+    : "Esses adicionais também aumentam o valor da hora extra (Súmulas 132 e 139 do TST).";
+  $("fech-calc").textContent = +c.fechamento
+    ? `O holerite de ${MESES[S.m]} conta as horas de ${rotuloPeriodo(S.y,S.m)}. A extra feita depois do dia ${c.fechamento} vai para o holerite seguinte.`
+    : "Deixe em branco se o holerite conta o mês inteiro, do dia 1 ao último dia. Se fecha, por exemplo, no dia 20, a extra do dia 21 em diante só entra no holerite seguinte.";
   $("custom-list").innerHTML = c.custom.length ? c.custom.map((f,i)=>{
     const {y,m,d}=parseIso(f.data);
     const quando = f.anual ? `${pad(d)}/${pad(m+1)} todo ano` : `${pad(d)}/${pad(m+1)}/${y}`;
@@ -860,7 +977,7 @@ function renderCal(){
   const {y,m}=S;
   $("mes-nome").textContent = `${cap(MESES[m])} de ${y}`;
   const calc = calcMes(y,m);
-  const porDia = Object.fromEntries(calc.itens.map(i=>[i.d,i]));
+  const porDia = porDiaVisivel(y,m);
   const hoje = (()=>{ const t=new Date(); return iso(t.getFullYear(),t.getMonth(),t.getDate()); })();
   let h = DOW_CURTO.map(d=>`<div class="dow">${d}</div>`).join("");
   const first=dowOf(y,m,1);
@@ -877,8 +994,8 @@ function renderCal(){
     else if(t.f && t.dec==="normal"){ tag=""; }
     if(d===S.sel) cls.push("sel");
     if(d===hoje) cls.push("today");
-    const chip = it ? `<span class="chip ${it.verd}">${fmtH(it.h.relogio)}<span class="p"> · ${it.pct}%</span></span>` : "";
-    const aria = `${dd} de ${MESES[m]}, ${DIAS[t.w]}${tag?", "+tag:""}${it?`, hora extra de ${fmtH(it.h.relogio)}, ${VERD_TXT[it.verd]}`:""}`;
+    const chip = chipDia(d, it);
+    const aria = `${dd} de ${MESES[m]}, ${DIAS[t.w]}${tag?", "+tag:""}${it?`, hora extra de ${fmtH(it.h.relogio)}, ${VERD_TXT[it.verd]}`:""}${(S.plan[d]||{}).falta?", falta":""}`;
     h+=`<button type="button" class="${cls.join(" ")}" data-d="${d}" aria-label="${esc(aria)}"><span class="d">${dd}</span>${tag?`<span class="tag">${esc(tag)}</span>`:""}${chip}</button>`;
   }
   $("cal").innerHTML=h;
@@ -895,7 +1012,7 @@ function renderStrip(calc){
   calc = calc || calcMes(S.y,S.m);
   const extraB = calc.full.bruto - calc.base.bruto, extraL = calc.full.liquido - calc.base.liquido;
   $("strip").innerHTML = `
-    <div><span class="eyebrow">Horas extras em ${MESES[S.m]}</span><span class="v">${fmtH(calc.horas)}</span><span class="small muted">${calc.itens.length} ${calc.itens.length===1?"dia":"dias"}</span></div>
+    <div><span class="eyebrow">Horas extras ${+S.cfg.fechamento?"de "+rotuloPeriodo(S.y,S.m):"em "+MESES[S.m]}</span><span class="v">${fmtH(calc.horas)}</span><span class="small muted">${calc.itens.length} ${calc.itens.length===1?"dia":"dias"}</span></div>
     <div><span class="eyebrow">Extra bruto (com DSR)</span><span class="v">${brl(extraB)}</span></div>
     <div><span class="eyebrow">Fica no seu bolso</span><span class="v">${brl(extraL)}</span><span class="small muted">${extraB?pctf(extraL/extraB)+" do extra":"—"}</span></div>
     <div><span class="eyebrow">Líquido previsto</span><span class="v">${brl(calc.full.liquido)}</span><span class="small muted">sem extras: ${brl(calc.base.liquido)}</span></div>`;
@@ -924,18 +1041,22 @@ function renderEditor(calc){
       </div></div>`;
   }
   const nomeFer = t.f && t.kind==="feriado" ? ` · ${esc(t.f.nome)}` : "";
-  const on = !!p.on, util = t.kind==="util";
+  const on = !!p.on && !p.falta, util = t.kind==="util", falta = util && !!p.falta;
+  const fd = folhaDe(d), fechaTxt = +S.cfg.fechamento && (fd.m!==m || fd.y!==y) ? ` · entra no holerite de ${MESES[fd.m]} (ponto fecha dia ${S.cfg.fechamento})` : "";
   // dia útil marcado na versão antiga (turno depois do expediente): converte para entrada/saída
   if(on && util && p.ent==null && p.fim){ p.ent=S.cfg.iniJornada; p.sai=p.fim; }
   // dia que deixou de ser útil (virou feriado ou emenda): usa entrada/saída como turno
   if(on && !util && p.ini==null && p.ent){ p.ini=p.ent; p.fim=p.sai; }
   ed.innerHTML = `<div class="editor">
     <div><h3>${cap(DIAS[t.w])}, ${dd} de ${MESES[m]}</h3>
-    <div class="kind">${KIND_TXT[t.kind]}${nomeFer} · sugestão de ${sug}%</div></div>
+    <div class="kind">${KIND_TXT[t.kind]}${nomeFer} · sugestão de ${sug}%${fechaTxt}</div></div>
     ${ask}
-    <label class="switch" for="ed-on"><span>Vou fazer hora extra neste dia</span><input type="checkbox" id="ed-on" ${on?"checked":""}></label>
+    ${falta ? "" : `<label class="switch" for="ed-on"><span>Vou fazer hora extra neste dia</span><input type="checkbox" id="ed-on" ${on?"checked":""}></label>`}
+    ${util && !on ? `<label class="switch" for="ed-falta"><span>Vou faltar neste dia (sem atestado)</span><input type="checkbox" id="ed-falta" ${falta?"checked":""}></label>` : ""}
+    ${falta ? `<div class="preview" id="ed-falta-info"></div>` : ""}
     <div id="ed-form" ${on?"":"hidden"}>
       <div class="stack" style="gap:12px">
+        ${podeTrocar(t.kind) ? `<label class="check"><input type="checkbox" id="ed-comp" ${p.comp?"checked":""}> <span>Vou ganhar uma folga em outro dia em troca deste</span></label>` : ""}
         ${util ? `
         <div class="row2">
           <div class="field"><label for="ed-ent">Vou entrar às</label><input type="time" id="ed-ent" value="${p.ent||""}"></div>
@@ -955,17 +1076,28 @@ function renderEditor(calc){
           </div>
           <span class="hint">Pode digitar outro valor se a sua convenção paga diferente.</span>
         </div>
+        <div class="alertas" id="ed-al" hidden></div>
         <div class="preview" id="ed-prev"></div>
         <div><button type="button" class="btn danger ghost" id="ed-rm">Apagar este dia</button></div>
       </div>
     </div>
   </div>`;
   renderPreview(calc);
-
   ed.querySelectorAll("[data-dec]").forEach(b=>b.addEventListener("click",()=>{
     const cur=S.plan[d]||{}; cur.dec = cur.dec===b.dataset.dec ? undefined : b.dataset.dec;
     S.plan[d]=cur; clean(d); onChange();
   }));
+  if(falta){
+    const cf=calcDoDia(d), f=cf.faltas, diaria=(salarioMensal()+adicionalMensal())/30;
+    $("ed-falta-info").innerHTML = salarioMensal()<=0
+      ? `<p class="empty">Informe o seu salário em Configuração para ver quanto a falta desconta.</p>`
+      : `<div class="ln"><span>Desconto do dia</span><span class="num">− ${brl(diaria)}</span></div>
+         <div class="ln"><span>Perde o DSR da semana</span><span class="num">− ${brl(diaria)}</span></div>
+         <p class="fine">Falta sem justificativa desconta o dia e o descanso remunerado daquela semana (Lei 605/49, art. 6º). Se faltar mais de um dia na mesma semana, o DSR só sai uma vez. No holerite: ${f.dias} ${f.dias===1?"falta":"faltas"}, − ${brl(f.vDias+f.vDsr)} no total.</p>`;
+    $("ed-falta").addEventListener("change",e=>{ const cur=S.plan[d]||{}; cur.falta=e.target.checked||undefined; S.plan[d]=cur; clean(d); onChange(); });
+    return;
+  }
+  if($("ed-falta")) $("ed-falta").addEventListener("change",e=>{ const cur=S.plan[d]||{}; cur.falta=e.target.checked||undefined; if(cur.falta) cur.on=false; S.plan[d]=cur; clean(d); onChange(); });
   $("ed-on").addEventListener("change",e=>{
     const cur=S.plan[d]||{};
     if(e.target.checked){
@@ -989,32 +1121,43 @@ function renderEditor(calc){
     else { cur.ini=$("ed-ini").value; cur.fim=$("ed-fim").value; cur.pausa=+$("ed-pausa").value||0; }
     const v=$("ed-pct").value;
     cur.pct = v==="" ? null : (+v===pctSugerido(tipoDia(d).kind) && cur.pct==null ? null : +v);
-    save(); const c=calcMes(S.y,S.m); renderCalOnly(c); renderStrip(c); renderPreview(c);
+    save(); const c=calcMes(S.y,S.m); renderCalOnly(); renderStrip(c); renderPreview(c);
     const sb=$("ed-sug"), s2=pctSugerido(tipoDia(d).kind);
     sb.dataset.on = cur.pct==null?1:0;
     sb.textContent = cur.pct==null ? `Usando a sugestão: ${s2}%` : `Voltar para a sugestão (${s2}%)`;
   };
   (util ? ["ed-ent","ed-sai","ed-pct"] : ["ed-ini","ed-fim","ed-pausa","ed-pct"]).forEach(id=>$(id).addEventListener("input",upd));
   $("ed-sug").addEventListener("click",()=>{ S.plan[d].pct=null; $("ed-pct").value=pctSugerido(tipoDia(d).kind); upd(); });
-  $("ed-rm").addEventListener("click",()=>{ const cur=S.plan[d]; ["on","ini","fim","pausa","pct","ent","sai"].forEach(k=>delete cur[k]); clean(d); onChange(); });
+  if($("ed-comp")) $("ed-comp").addEventListener("change",e=>{ S.plan[d].comp=e.target.checked||undefined; save(); const c=calcMes(S.y,S.m); renderCalOnly(); renderStrip(c); renderPreview(c); });
+  $("ed-rm").addEventListener("click",()=>{ const cur=S.plan[d]; ["on","ini","fim","pausa","pct","ent","sai","comp"].forEach(k=>delete cur[k]); clean(d); onChange(); });
 }
-function clean(d){ const p=S.plan[d]; if(p && !p.on && !p.dec && !p.ini && !p.ent) delete S.plan[d]; }
+function clean(d){ const p=S.plan[d]; if(p && !p.on && !p.dec && !p.ini && !p.ent && !p.falta) delete S.plan[d]; }
 
+function chipDia(d, it){
+  const p=S.plan[d]||{};
+  if(p.falta && tipoDia(d).kind==="util") return `<span class="chip bad">Falta</span>`;
+  if(p.on && p.comp && podeTrocar(tipoDia(d).kind)) return `<span class="chip troca">Troca</span>`;
+  if(!it) return "";
+  const al = avisosDia(d).length ? `<span class="al" title="Passa de algum limite da CLT">⚠</span>` : "";
+  return `<span class="chip ${it.verd}">${fmtH(it.h.relogio)}<span class="p"> · ${it.pct}%</span>${al}</span>`;
+}
 /* Atualiza só os chips do calendário sem recriar o editor (mantém o foco nos campos) */
-function renderCalOnly(calc){
-  const porDia=Object.fromEntries(calc.itens.map(i=>[i.d,i]));
+function renderCalOnly(){
+  const porDia=porDiaVisivel(S.y,S.m);
   $("cal").querySelectorAll("[data-d]").forEach(b=>{
-    const it=porDia[b.dataset.d]; let chip=b.querySelector(".chip");
-    if(!it){ if(chip) chip.remove(); return; }
-    if(!chip){ chip=document.createElement("span"); b.appendChild(chip); }
-    chip.className="chip "+it.verd;
-    chip.innerHTML=`${fmtH(it.h.relogio)}<span class="p"> · ${it.pct}%</span>`;
+    const html=chipDia(b.dataset.d, porDia[b.dataset.d]); let chip=b.querySelector(".chip");
+    if(chip) chip.remove();
+    if(html) b.insertAdjacentHTML("beforeend", html);
   });
 }
 
 function renderPreview(calc){
   const box=$("ed-prev"); if(!box) return;
-  const it=calc.itens.find(i=>i.d===S.sel);
+  calc = calcDoDia(S.sel);
+  const al=$("ed-al"), avs=avisosDia(S.sel);
+  if(al){ al.hidden=!avs.length; al.innerHTML=avs.map(a=>`<span>⚠ ${a}</span>`).join(""); }
+  const it=calc.itens.find(i=>i.d===S.sel), pp=S.plan[S.sel]||{};
+  if(!it && pp.comp && podeTrocar(tipoDia(S.sel).kind)){ box.innerHTML=`<p class="empty">Com uma folga em troca, este dia não entra como hora extra no holerite: você só troca o dia de descanso. O pagamento em dobro vale quando não há folga compensatória (Súmula 146 do TST).</p>`; return; }
   if(!it){ box.innerHTML = tipoDia(S.sel).kind==="util"
     ? `<p class="empty">Com esses horários não há hora extra: mude a entrada para antes das ${S.cfg.iniJornada} ou a saída para depois das ${S.cfg.fimJornada}.</p>`
     : `<p class="empty">Confira o horário de início e de fim.</p>`; return; }
@@ -1026,12 +1169,13 @@ function renderPreview(calc){
     <div class="ln"><span>Horas extras</span><span class="num">${fmtH(it.h.relogio)}</span></div>
     ${partes}
     ${noturno}
-    <div class="ln"><span>Valor da hora com ${it.pct}%</span><span class="num">${brl(valorHora()*(1+it.pct/100))}</span></div>
+    <div class="ln"><span>Valor da hora com ${it.pct}%${adicionalMensal()?" (já com o adicional)":""}</span><span class="num">${brl(valorHoraHE()*(1+it.pct/100))}</span></div>
     <div class="ln"><span>Bruto do dia</span><span class="num">${brl(it.valor)}</span></div>
     ${dsrTxt}
     <div class="ln"><span>Vai embora em INSS e IR</span><span class="num">− ${brl(it.bruto-it.liq)}</span></div>
     <div class="verdict ${it.verd}"><span>${VERD_TXT[it.verd]}<br><span class="small" style="font-weight:500">Fica ${brl(it.liq)} · ${brl(it.liq/it.h.relogio)} por hora</span></span><span class="big">${pctf(it.ret)}</span></div>
-    <p class="fine">A porcentagem mostra quanto deste dia fica com você, considerando os outros dias que já estão marcados no mês.</p>`;
+    <div class="ln"><span>Além disso, depósito no FGTS (8%)</span><span class="num">+ ${brl(it.bruto*.08)}</span></div>
+    <p class="fine">A porcentagem mostra quanto deste dia fica com você, considerando os outros dias que já estão marcados no mês. O FGTS não entra no líquido, mas é dinheiro seu.${S.cfg.bancoHoras?" Como a empresa usa banco de horas, este dia pode virar folga em vez de pagamento.":""}</p>`;
 }
 
 /* ===================== Holerite ===================== */
@@ -1046,8 +1190,11 @@ function renderHol(){
   const extraB=full.bruto-base.bruto, extraL=full.liquido-base.liquido;
   const inssX=full.inss-base.inss, irX=full.ir-base.ir;
   const mesPag = MESES[(S.m+1)%12];
+  const extras = [];
+  if(extraB>0) extras.push(`Além do líquido, a empresa deposita <b class="num">${brl(c.fgts)}</b> no seu FGTS por causa das extras (8%). Se a hora extra for frequente, ela também aumenta o 13º e as férias.`);
+  if(cfg.bancoHoras) extras.push(`Sua empresa usa banco de horas: as horas marcadas podem virar folga em vez de dinheiro. Os valores mostram quanto elas valeriam se fossem pagas.`);
   $("hol-top").innerHTML = `
-    <div class="eyebrow">Horas de ${MESES[S.m]}/${S.y} · normalmente pagas no holerite de ${mesPag}</div>
+    <div class="eyebrow">Horas de ${rotuloPeriodo(S.y,S.m)} · normalmente pagas ${+cfg.fechamento?`no holerite de ${MESES[S.m]}, no começo de ${mesPag}`:`no holerite de ${mesPag}`}</div>
     <div class="liq" style="margin-top:6px"><span class="val">${brl(full.liquido)}</span>${extraL>0?`<span class="delta">+ ${brl(extraL)} com as extras</span>`:""}</div>
     <p class="small muted" style="margin:2px 0 14px">Líquido previsto. Sem horas extras seria ${brl(base.liquido)}.</p>
     ${extraB>0 ? `
@@ -1059,7 +1206,8 @@ function renderHol(){
       <span><i style="background:var(--good)"></i>Fica com você <b class="num">${brl(extraL)}</b> (${pctf(extraL/extraB)})</span>
       <span><i style="background:var(--muted)"></i>INSS <b class="num">${brl(inssX)}</b></span>
       <span><i style="background:var(--bad)"></i>Imposto de Renda <b class="num">${brl(irX)}</b></span>
-    </div>` : `<p class="empty">Nenhuma hora extra marcada em ${MESES[S.m]}. Vá até o Calendário e marque os dias.</p>`}`;
+    </div>` : `<p class="empty">Nenhuma hora extra marcada em ${rotuloPeriodo(S.y,S.m)}. Vá até o Calendário e marque os dias.</p>`}
+    ${extras.map(t=>`<p class="small" style="margin:12px 0 0">${t}</p>`).join("")}`;
 
   // Tabela no formato de holerite
   const grupos={};
@@ -1071,10 +1219,15 @@ function renderHol(){
   const L=(desc,ref,prov,dsc,sub)=>`<tr><td>${desc}${sub?`<div class="sub">${sub}</div>`:""}</td><td class="n">${ref}</td><td class="n">${prov?brl(prov):""}</td><td class="n">${dsc?brl(dsc):""}</td></tr>`;
   let rows = `<tr><th>Descrição</th><th class="n">Ref.</th><th class="n">Proventos</th><th class="n">Descontos</th></tr>`;
   rows += L("Salário base", cfg.divisor+"h", full.sal);
+  if(full.adic) rows += L(ADIC[cfg.adicional][0], "", full.adic, 0, ADIC[cfg.adicional][2]==="min" ? `sobre o salário mínimo (${brl(SAL_MIN)})` : "sobre o salário base");
   if(+cfg.outrosProventos) rows += L("Outros ganhos fixos","",+cfg.outrosProventos);
   Object.keys(grupos).sort().forEach(k=>{ const g=grupos[k]; rows+=L(g.nome, fmtH(g.h), g.v); });
   if(c.dsr>0) rows += L("DSR sobre horas extras", `${c.descansos}/${c.uteis}`, c.dsr, 0, `${c.descansos} dias de descanso ÷ ${c.uteis} dias úteis no mês`);
-  rows += L("INSS", pctf(full.inss/full.bruto).replace("%","")+"%", 0, full.inss, "alíquota efetiva");
+  if(c.faltas.dias){
+    rows += L("Faltas", c.faltas.dias+(c.faltas.dias===1?" dia":" dias"), 0, c.faltas.vDias);
+    rows += L("DSR perdido pelas faltas", c.faltas.semanas+(c.faltas.semanas===1?" semana":" semanas"), 0, c.faltas.vDsr, "falta sem justificativa tira o descanso remunerado da semana");
+  }
+  rows += L("INSS", pctf(full.inss/(full.trib||1)).replace("%","")+"%", 0, full.inss, "alíquota efetiva");
   const irSub = `base ${brl(full.base)} (${full.usaSimp?"desconto simplificado":"deduções legais"})` + (full.red>0?` · redução da Lei 15.270: − ${brl(full.red)}`:"");
   rows += `<tr><td>Imposto de Renda (IRRF)<div class="sub">${irSub}</div></td><td class="n"></td><td class="n"></td><td class="n">${full.ir>0?brl(full.ir):"isento"}</td></tr>`;
   if(full.vt) rows += L("Vale-transporte","6%",0,full.vt);
@@ -1086,8 +1239,8 @@ function renderHol(){
   $("hol-tbl").innerHTML = rows;
 
   // Recomendação
-  const vh=valorHora(), fD=1+c.fDSR;
-  const folgaIR = TAB.isento - base.bruto;
+  const vh=valorHoraHE(), fD=1+c.fDSR;
+  const folgaIR = TAB.isento - base.trib;
   let reco="";
   const ruins=c.itens.filter(i=>i.verd==="bad"), medios=c.itens.filter(i=>i.verd==="warn");
   if(!c.itens.length) reco=`<p class="reco">Você ainda não marcou dias em ${MESES[S.m]}.</p>`;
