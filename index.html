@@ -1094,7 +1094,15 @@ $("hol-reco").addEventListener("click",e=>{
 /* ===================== Conta (opcional, Firebase) =====================
    Sem login tudo fica só no aparelho. Com login, cfg e plan vão para usuarios/{uid}
    no Firestore; as regras do banco só deixam o próprio dono ler e gravar. */
-const FIREBASE_CONFIG = null; // cole aqui o firebaseConfig do console do Firebase
+// Configuração pública do app Web (não é segredo; quem protege os dados são as regras do Firestore)
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyD2WY-3k_knArs-_5rBj_zDZm_kgzfew9I",
+  authDomain: "vale-a-hora-extra.firebaseapp.com",
+  projectId: "vale-a-hora-extra",
+  storageBucket: "vale-a-hora-extra.firebasestorage.app",
+  messagingSenderId: "550013802364",
+  appId: "1:550013802364:web:095c9622a17620993536f9"
+};
 const FB_VER = "10.12.2";
 const SITE = "https://rodrigomcorrea.github.io/vale-a-hora-extra/";
 let usuario=null, nuvemPronta=false, nuvemTimer=null, conflito=null, apagarArmado=false, contaEstado="";
