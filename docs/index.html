@@ -173,6 +173,7 @@ table.mini td.num,table.mini th.num{text-align:right}
 .chip.good{background:var(--good);color:var(--surface)}
 .chip.warn{background:var(--warn);color:var(--surface)}
 .chip.bad{background:var(--bad);color:var(--surface)}
+.chip.none{background:var(--muted);color:var(--surface)}
 .chip .p{display:none}
 @media (min-width:560px){.chip .p{display:inline}}
 @media (max-width:420px){.day{min-height:60px;padding:4px}.day .tag{display:none}.day.k-fer::after,.day.k-duvida::after{content:"";position:absolute;top:6px;right:6px;width:6px;height:6px;border-radius:50%;background:var(--fer)}.day.k-duvida::after{background:var(--warn)}}
@@ -264,8 +265,8 @@ table.hol td.sub{color:var(--muted);font-size:.8rem}
   </header>
 
   <div class="banner" id="banner" hidden>
-    <span>Você está vendo <b>valores de exemplo</b>. Coloque o seu salário em Configuração para a previsão valer para você.</span>
-    <button class="btn primary" id="go-cfg">Configurar meu salário</button>
+    <span>Para começar, informe o <b>valor da sua hora</b> (ou o salário) e o seu estado em Configuração.</span>
+    <button class="btn primary" id="go-cfg">Ir para Configuração</button>
   </div>
 
   <!-- ============ CONFIGURAÇÃO ============ -->
@@ -489,10 +490,10 @@ const DIAS = ["domingo","segunda-feira","terça-feira","quarta-feira","quinta-fe
 const DOW_CURTO = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
 
 const DEF = {
-  modo:"hora", salario:4600, valorHora:20.91, divisor:220, outrosProventos:0,
-  uf:"SP", cidade:3550308, sabadoUtil:false, iniJornada:"08:00", fimJornada:"17:00", iniFds:"08:00", fimFds:"14:00",
+  modo:"hora", salario:0, valorHora:0, divisor:220, outrosProventos:0,
+  uf:"", cidade:"", sabadoUtil:false, iniJornada:"08:00", fimJornada:"17:00", iniFds:"08:00", fimFds:"14:00",
   pctUtil:50, pctSab:50, pctDom:100, pctFer:100, adNot:20, horaReduzida:true, dsr:true,
-  dependentes:0, pensao:0, vt:true, vtCusto:250, plano:0,
+  dependentes:0, pensao:0, vt:false, vtCusto:0, plano:0,
   descontosExtras:[], custom:[], exemplo:true
 };
 
@@ -524,8 +525,9 @@ function pascoa(y){
 /* ===================== Estado ===================== */
 const KEY = "vale-hora-extra-v1";
 let S;
-function load(){ try{ const raw=localStorage.getItem(KEY); if(!raw) return null; const s=JSON.parse(raw); s.cfg={...DEF,...s.cfg}; s.plan=s.plan||{};
-  if(s.cfg.exemplo) s.cfg.modo="hora";
+function load(){ try{ const raw=localStorage.getItem(KEY); if(!raw) return null; const s=JSON.parse(raw);
+  if(!s.cfg || s.cfg.exemplo) return null; // nunca mexeu: começa do zero
+  s.cfg={...DEF,...s.cfg}; s.plan=s.plan||{};
   if(+s.cfg.outrosDescontos){ s.cfg.descontosExtras=[{nome:"Outros descontos",valor:+s.cfg.outrosDescontos}]; }
   delete s.cfg.outrosDescontos;
   if(typeof s.cfg.cidade==="string"){
@@ -537,10 +539,7 @@ function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} 
 function seed(){
   const t=new Date(); let y=t.getFullYear(), m=t.getMonth();
   if(t.getDate()>20){ m++; if(m>11){m=0;y++;} }
-  const plan={}; const sabs=[], doms=[];
-  for(let d=1; d<=diasNoMes(y,m); d++){ const w=dowOf(y,m,d); if(w===6) sabs.push(d); if(w===0) doms.push(d); }
-  [sabs[0], doms[2] ?? doms[1], sabs[sabs.length-1]].forEach(d=>{ plan[iso(y,m,d)]={on:true,ini:"08:00",fim:"14:00",pausa:0,pct:null}; });
-  return {cfg:{...DEF}, plan, y, m, sel:iso(y,m,sabs[0]), tab:"cal"};
+  return {cfg:{...DEF, custom:[], descontosExtras:[]}, plan:{}, y, m, sel:null, tab:"cfg"};
 }
 S = load() || seed();
 
@@ -694,7 +693,7 @@ function calcMes(y,m){
     it.bruto = it.valor*(1+fDSR);
     it.liq = full.liquido - fs.liquido;
     it.ret = it.bruto>0 ? it.liq/it.bruto : 1;
-    it.verd = veredito(it.ret);
+    it.verd = it.bruto>0 ? veredito(it.ret) : "none";
   });
   // quanto sobraria de mais R$ 100 de extra
   const x = 100/(1+fDSR);
@@ -702,22 +701,23 @@ function calcMes(y,m){
   return {y,m,uteis,descansos,fDSR,he,dsr:he*fDSR,itens,base,full,prox,horas:itens.reduce((s,i)=>s+i.h.relogio,0)};
 }
 function veredito(r){ return r>=.70 ? "good" : r>=.55 ? "warn" : "bad"; }
-const VERD_TXT = {good:"Vale a pena", warn:"Rende menos", bad:"Imposto come muito"};
+const VERD_TXT = {good:"Vale a pena", warn:"Rende menos", bad:"Imposto come muito", none:"Falta o valor da hora"};
 
 /* ===================== Abas ===================== */
 function setTab(t){
   S.tab=t; save();
   ["cfg","cal","hol"].forEach(k=>{ $("tab-"+k).hidden = k!==t; $("t-"+k).setAttribute("aria-selected", k===t); });
   if(t==="hol") renderHol();
+  renderBanner();
 }
 document.querySelectorAll(".tabs button").forEach(b=>b.addEventListener("click",()=>setTab(b.dataset.tab)));
 $("go-cfg").addEventListener("click",()=>setTab("cfg"));
-function renderBanner(){ $("banner").hidden = !S.cfg.exemplo; }
+function renderBanner(){ $("banner").hidden = valorHora()>0 || S.tab==="cfg"; }
 
 /* ===================== Configuração ===================== */
 function initCfg(){
   const sel=$("c-uf");
-  sel.innerHTML = Object.entries(UFS).map(([k,v])=>`<option value="${k}">${v}</option>`).join("");
+  sel.innerHTML = `<option value="">Selecione o estado</option>` + Object.entries(UFS).map(([k,v])=>`<option value="${k}">${v}</option>`).join("");
   fillCidades();
   renderDesc();
   $("desc-add").addEventListener("click",()=>{
@@ -774,8 +774,9 @@ function initCfg(){
 /* Coloca os valores de S.cfg nos campos (na abertura e quando os dados chegam da nuvem) */
 function preencherCfg(){
   document.querySelectorAll("[data-k]").forEach(el=>{
-    const v=S.cfg[el.dataset.k];
-    if(el.type==="checkbox") el.checked=!!v; else el.value = v;
+    const k=el.dataset.k, v=S.cfg[k];
+    if(el.type==="checkbox") el.checked=!!v;
+    else el.value = (["salario","valorHora","vtCusto"].includes(k) && !v) ? "" : v;
   });
   fillCidades(); renderDesc();
 }
@@ -817,7 +818,9 @@ function renderCfgDyn(){
   const c=S.cfg;
   const fc=feriadosCidade(), cid=CID_POR_IBGE[c.cidade];
   const fmtFer = ([k,n]) => k.length===4 ? `${n} (${k.slice(2)}/${k.slice(0,2)})` : n;
-  $("cidade-fer").textContent = !cid
+  $("cidade-fer").textContent = !c.uf
+    ? "Escolha o estado primeiro, ou toque em \"Usar minha localização\"."
+    : !cid
     ? "Digite e escolha a cidade na lista para puxar os feriados municipais."
     : fc === null
       ? `Ainda não temos os feriados de ${cid.nome}. Adicione o aniversário da cidade e o padroeiro em "Outros feriados e folgas".`
@@ -828,7 +831,7 @@ function renderCfgDyn(){
   $("f-salario").hidden = c.modo!=="mensal";
   $("f-hora").hidden = c.modo!=="hora";
   $("f-vt").hidden = !c.vt;
-  $("hora-calc").textContent = c.modo==="mensal"
+  $("hora-calc").textContent = valorHora()<=0 ? "Está no holerite como \"valor hora\" ou \"salário hora\"." : c.modo==="mensal"
     ? `Sua hora normal vale ${brl(valorHora())}.`
     : `Seu salário base fica em ${brl(salarioMensal())} por mês.`;
   $("custom-list").innerHTML = c.custom.length ? c.custom.map((f,i)=>{
@@ -1013,6 +1016,7 @@ function renderPreview(calc){
   if(!it){ box.innerHTML = tipoDia(S.sel).kind==="util"
     ? `<p class="empty">Com esses horários não há hora extra: mude a entrada para antes das ${S.cfg.iniJornada} ou a saída para depois das ${S.cfg.fimJornada}.</p>`
     : `<p class="empty">Confira o horário de início e de fim.</p>`; return; }
+  if(valorHora()<=0){ box.innerHTML=`<p class="empty">Dia marcado: ${fmtH(it.h.relogio)} a ${it.pct}%. Informe o valor da sua hora em Configuração para ver quanto esse dia rende.</p>`; return; }
   const partes = (it.h.antes||it.h.depois) ? `<div class="ln"><span>Chegando mais cedo · saindo mais tarde</span><span class="num">${fmtH(it.h.antes)} · ${fmtH(it.h.depois)}</span></div>` : "";
   const noturno = it.h.noite>0 ? `<div class="ln"><span>Horas noturnas (22h às 5h)</span><span class="num">${fmtH(it.h.noite)}${S.cfg.horaReduzida?` → ${fmtH(it.noitePaga)} pagas`:""}</span></div>` : "";
   const dsrTxt = calc.fDSR ? `<div class="ln"><span>Reflexo no DSR</span><span class="num">+ ${brl(it.bruto-it.valor)}</span></div>` : "";
@@ -1030,6 +1034,12 @@ function renderPreview(calc){
 
 /* ===================== Holerite ===================== */
 function renderHol(){
+  if(salarioMensal()<=0){
+    $("hol-top").innerHTML=`<h3>Ainda falta o seu salário</h3><p class="empty">Informe o valor da sua hora (ou o salário mensal) em Configuração. Depois marque no Calendário os dias de hora extra e o holerite previsto aparece aqui.</p><div><button class="btn primary" type="button" id="hol-go">Ir para Configuração</button></div>`;
+    $("hol-go").addEventListener("click",()=>setTab("cfg"));
+    ["hol-tbl","hol-reco","hol-meter"].forEach(id=>$(id).innerHTML="");
+    return;
+  }
   const c=calcMes(S.y,S.m), {base,full}=c, cfg=S.cfg;
   const extraB=full.bruto-base.bruto, extraL=full.liquido-base.liquido;
   const inssX=full.inss-base.inss, irX=full.ir-base.ir;
