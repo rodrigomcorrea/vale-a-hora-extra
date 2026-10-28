@@ -109,6 +109,13 @@ input[type=number]{font-family:var(--f-num)}
 .custom-list li{display:flex;gap:8px;align-items:center;font-size:.9rem;padding:6px 8px;background:var(--bg);border-radius:8px}
 .custom-list li span{flex:1;min-width:0}
 .custom-list button{border:0;background:transparent;color:var(--bad);cursor:pointer;font:inherit;font-size:.85rem}
+.top-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.acc-chip{font-size:.82rem}
+.acc-chip[data-on="1"]{color:var(--good)}
+.conta-acoes{display:flex;gap:8px;flex-wrap:wrap}
+.conta-status{font-size:.85rem;color:var(--muted)}
+.conta-status.ok{color:var(--good)}
+.conta-status.erro{color:var(--bad)}
 .city-row{display:flex;gap:8px;flex-wrap:wrap}
 .city-row input{flex:1 1 180px}
 .desc-list{display:flex;flex-direction:column;gap:6px}
@@ -226,11 +233,14 @@ table.hol td.sub{color:var(--muted);font-size:.8rem}
       <h1>Vale a hora extra?</h1>
       <p>Marque os dias em que pretende trabalhar a mais e veja quanto realmente sobra depois do INSS e do Imposto de Renda.</p>
     </div>
+    <div class="top-right">
+    <button class="btn acc-chip" id="acc-chip" type="button" hidden></button>
     <nav class="tabs" role="tablist">
       <button role="tab" data-tab="cfg" id="t-cfg">Configuração</button>
       <button role="tab" data-tab="cal" id="t-cal">Calendário</button>
       <button role="tab" data-tab="hol" id="t-hol">Holerite</button>
     </nav>
+    </div>
   </header>
 
   <div class="banner" id="banner" hidden>
@@ -241,6 +251,10 @@ table.hol td.sub{color:var(--muted);font-size:.8rem}
   <!-- ============ CONFIGURAÇÃO ============ -->
   <section id="tab-cfg" hidden>
     <div class="cfg-grid">
+      <div class="panel" id="conta-panel">
+        <h2>Sua conta (opcional)</h2>
+        <div id="conta" class="stack" style="gap:10px"></div>
+      </div>
       <div class="panel">
         <h2>Seu salário</h2>
         <div class="field">
@@ -499,7 +513,7 @@ function load(){ try{ const raw=localStorage.getItem(KEY); if(!raw) return null;
     s.cfg.cidade = achou ? achou.ibge : "";
   }
   return s; }catch(e){ return null; } }
-function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} agendarNuvem(); }
 function seed(){
   const t=new Date(); let y=t.getFullYear(), m=t.getMonth();
   if(t.getDate()>20){ m++; if(m>11){m=0;y++;} }
@@ -700,9 +714,9 @@ function initCfg(){
     const i=e.target.dataset.rmd; if(i==null) return;
     S.cfg.descontosExtras.splice(+i,1); renderDesc(); onChange();
   });
+  preencherCfg();
   document.querySelectorAll("[data-k]").forEach(el=>{
-    const k=el.dataset.k, v=S.cfg[k];
-    if(el.type==="checkbox") el.checked=!!v; else el.value = v;
+    const k=el.dataset.k;
     el.addEventListener(el.tagName==="SELECT"||el.type==="checkbox" ? "change" : "input", ()=>{
       let val;
       if(el.type==="checkbox") val=el.checked;
@@ -736,6 +750,14 @@ function initCfg(){
     location.reload();
   });
   renderTabelas();
+}
+/* Coloca os valores de S.cfg nos campos (na abertura e quando os dados chegam da nuvem) */
+function preencherCfg(){
+  document.querySelectorAll("[data-k]").forEach(el=>{
+    const v=S.cfg[el.dataset.k];
+    if(el.type==="checkbox") el.checked=!!v; else el.value = v;
+  });
+  fillCidades(); renderDesc();
 }
 function fillCidades(){
   $("lista-cidades").innerHTML = (CID_POR_UF[S.cfg.uf]||[]).map(c=>`<option value="${esc(c.nome)}">`).join("");
@@ -1069,11 +1091,147 @@ $("hol-reco").addEventListener("click",e=>{
   S.sel=li.dataset.go; setTab("cal"); renderCal();
 });
 
+/* ===================== Conta (opcional, Firebase) =====================
+   Sem login tudo fica só no aparelho. Com login, cfg e plan vão para usuarios/{uid}
+   no Firestore; as regras do banco só deixam o próprio dono ler e gravar. */
+const FIREBASE_CONFIG = null; // cole aqui o firebaseConfig do console do Firebase
+const FB_VER = "10.12.2";
+const SITE = "https://rodrigomcorrea.github.io/vale-a-hora-extra/";
+let usuario=null, nuvemPronta=false, nuvemTimer=null, conflito=null, apagarArmado=false, contaEstado="";
+
+const noSite = () => /(^|\.)github\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
+const docNuvem = () => firebase.firestore().collection("usuarios").doc(usuario.uid);
+const limpo = o => JSON.parse(JSON.stringify(o));
+function estavel(o){
+  if(Array.isArray(o)) return o.map(estavel);
+  if(o && typeof o==="object") return Object.keys(o).sort().reduce((r,k)=>(r[k]=estavel(o[k]),r),{});
+  return o;
+}
+const igual = (a,b) => JSON.stringify(estavel(limpo(a)))===JSON.stringify(estavel(limpo(b)));
+
+function carregarScript(src){
+  return new Promise((ok,erro)=>{ const s=document.createElement("script"); s.src=src; s.onload=ok; s.onerror=erro; document.head.appendChild(s); });
+}
+async function iniciarConta(){
+  if(!FIREBASE_CONFIG){ renderConta("indisponivel"); return; }
+  if(!noSite()){ renderConta("fora"); return; }
+  renderConta("carregando");
+  try{
+    for(const m of ["app","auth","firestore"]) await carregarScript(`https://cdn.jsdelivr.net/npm/firebase@${FB_VER}/firebase-${m}-compat.js`);
+    firebase.initializeApp(FIREBASE_CONFIG);
+    firebase.auth().onAuthStateChanged(u=>{
+      usuario=u; nuvemPronta=false; conflito=null;
+      if(u) puxarNuvem(); else renderConta("deslogado");
+    });
+  }catch(e){ renderConta("erro", "Não foi possível carregar o login. Confira a internet e recarregue a página."); }
+}
+
+async function entrar(){
+  const prov=new firebase.auth.GoogleAuthProvider();
+  try{ await firebase.auth().signInWithPopup(prov); }
+  catch(e){
+    if(e.code==="auth/popup-blocked") return firebase.auth().signInWithRedirect(prov);
+    if(e.code!=="auth/popup-closed-by-user" && e.code!=="auth/cancelled-popup-request") renderConta("erro","Não foi possível entrar. Tente de novo.");
+  }
+}
+async function sair(){ clearTimeout(nuvemTimer); await firebase.auth().signOut(); }
+
+async function puxarNuvem(){
+  renderConta("sincronizando");
+  try{
+    const snap=await docNuvem().get();
+    if(snap.exists){
+      const d=snap.data();
+      const local={cfg:S.cfg, plan:S.plan}, nuvem={cfg:{...DEF,...d.cfg}, plan:d.plan||{}};
+      if(!S.cfg.exemplo && !igual(local,nuvem)){ conflito=nuvem; renderConta("conflito"); return; }
+      aplicar(nuvem);
+    } else {
+      await enviarNuvem();
+    }
+    nuvemPronta=true; renderConta("logado","Tudo salvo na nuvem.");
+  }catch(e){ renderConta("erro","Não foi possível falar com a nuvem. Seus dados continuam salvos neste aparelho."); }
+}
+function aplicar(d){
+  S.cfg={...DEF,...d.cfg}; S.plan=d.plan||{};
+  try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){}
+  preencherCfg(); onChange();
+}
+async function resolverConflito(usarNuvem){
+  if(usarNuvem) aplicar(conflito);
+  conflito=null;
+  try{ if(!usarNuvem) await enviarNuvem(); nuvemPronta=true; renderConta("logado","Tudo salvo na nuvem."); }
+  catch(e){ renderConta("erro","Não foi possível salvar na nuvem."); }
+}
+function agendarNuvem(){
+  if(!usuario || !nuvemPronta) return;
+  clearTimeout(nuvemTimer);
+  setStatus("Salvando…","");
+  nuvemTimer=setTimeout(()=>{
+    enviarNuvem().then(()=>setStatus("Tudo salvo na nuvem.","ok"))
+      .catch(()=>setStatus("Não foi possível salvar na nuvem agora. Seus dados continuam neste aparelho.","erro"));
+  },1500);
+}
+function enviarNuvem(){
+  return docNuvem().set({...limpo({cfg:S.cfg, plan:S.plan}), v:1, atualizado:firebase.firestore.FieldValue.serverTimestamp()});
+}
+async function apagarConta(){
+  if(!apagarArmado){ apagarArmado=true; renderConta("logado"); return; }
+  clearTimeout(nuvemTimer); nuvemPronta=false;
+  try{
+    await docNuvem().delete();
+    try{ await usuario.delete(); }
+    catch(e){
+      if(e.code!=="auth/requires-recent-login") throw e;
+      await usuario.reauthenticateWithPopup(new firebase.auth.GoogleAuthProvider());
+      await usuario.delete();
+    }
+    apagarArmado=false;
+    renderConta("deslogado","Sua conta e os dados na nuvem foram apagados. Os dados deste aparelho continuam aqui.");
+  }catch(e){ apagarArmado=false; nuvemPronta=true; renderConta("erro","Não foi possível apagar agora. Tente de novo."); }
+}
+
+function setStatus(txt, cls){ const el=$("conta-status"); if(el){ el.textContent=txt; el.className="conta-status "+(cls||""); } }
+function renderConta(estado, msg){
+  if(estado) contaEstado=estado; estado=contaEstado;
+  const box=$("conta"), chip=$("acc-chip");
+  const privacidade=`<p class="fine">Guardamos só a sua configuração e os dias marcados, ligados à sua conta Google. Ninguém além de você consegue ler esses dados. Você pode apagar tudo quando quiser.</p>`;
+  const st = msg ? `<p class="conta-status ${estado==="erro"?"erro":(estado==="logado"?"ok":"")}" id="conta-status">${esc(msg)}</p>` : `<p class="conta-status" id="conta-status"></p>`;
+  chip.hidden = estado==="indisponivel";
+  chip.dataset.on = usuario && estado==="logado" ? "1" : "0";
+  chip.textContent = usuario ? (estado==="logado" ? "Salvo na nuvem" : "Conta") : "Entrar";
+  if(estado==="indisponivel"){
+    box.innerHTML=`<p class="small muted" style="margin:0">Seus dados ficam salvos neste aparelho. Em breve vai dar para entrar com a conta Google e levar tudo para outro celular.</p>`;
+  } else if(estado==="fora"){
+    box.innerHTML=`<p class="small" style="margin:0">Para entrar e salvar na nuvem, abra o site:</p><p class="small" style="margin:0"><a href="${SITE}" target="_blank" rel="noopener">${SITE}</a></p>`;
+  } else if(estado==="carregando" || estado==="sincronizando"){
+    box.innerHTML=`<p class="small muted" style="margin:0">${estado==="carregando"?"Carregando…":"Buscando seus dados na nuvem…"}</p>`;
+  } else if(estado==="deslogado"){
+    box.innerHTML=`<p class="small" style="margin:0">Hoje seus dados ficam só neste aparelho. Entre com a conta Google para não perder nada e abrir em qualquer celular.</p>
+      <div class="conta-acoes"><button class="btn primary" type="button" id="c-entrar">Entrar com Google</button></div>${st}${privacidade}`;
+  } else if(estado==="conflito"){
+    box.innerHTML=`<p class="small" style="margin:0">Você já tem dados salvos na nuvem, diferentes dos deste aparelho. Quais quer manter?</p>
+      <div class="conta-acoes"><button class="btn primary" type="button" id="c-usar-nuvem">Usar os da nuvem</button><button class="btn" type="button" id="c-usar-local">Usar os deste aparelho</button></div>
+      <p class="fine">A opção que você não escolher será substituída.</p>`;
+  } else if(estado==="logado" || estado==="erro"){
+    const quem = usuario ? `<p class="small" style="margin:0">Conta: <b>${esc(usuario.email||usuario.displayName||"")}</b>.</p>` : "";
+    box.innerHTML=`${quem}${st}
+      ${usuario?`<div class="conta-acoes"><button class="btn" type="button" id="c-sair">Sair</button><button class="btn danger ghost" type="button" id="c-apagar">${apagarArmado?"Clique de novo para apagar":"Apagar conta e dados da nuvem"}</button></div>
+      ${apagarArmado?`<p class="fine">Isso apaga os dados na nuvem e a sua conta neste site. O que está neste aparelho continua.</p>`:""}`
+      :`<div class="conta-acoes"><button class="btn primary" type="button" id="c-entrar">Entrar com Google</button></div>`}
+      ${privacidade}`;
+  }
+  const on=(id,fn)=>{ const b=$(id); if(b) b.addEventListener("click",fn); };
+  on("c-entrar",entrar); on("c-sair",sair); on("c-apagar",apagarConta);
+  on("c-usar-nuvem",()=>resolverConflito(true)); on("c-usar-local",()=>resolverConflito(false));
+}
+$("acc-chip").addEventListener("click",()=>{ setTab("cfg"); $("conta-panel").scrollIntoView({block:"start"}); });
+
 /* ===================== Ciclo ===================== */
 function onChange(){
   save(); renderBanner(); renderCfgDyn(); renderCal();
   if(S.tab==="hol") renderHol();
 }
 initCfg(); renderBanner(); renderCfgDyn(); renderCal(); setTab(S.tab||"cal");
+iniciarConta();
 })();
 </script>

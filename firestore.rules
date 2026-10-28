@@ -1,0 +1,15 @@
+rules_version = '2';
+// Cada pessoa só lê e grava o próprio documento: usuarios/{uid}.
+// Qualquer outro caminho do banco fica fechado.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /usuarios/{uid} {
+      allow read, delete: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['cfg', 'plan', 'v', 'atualizado'])
+        && request.resource.data.cfg is map
+        && request.resource.data.plan is map;
+    }
+  }
+}
