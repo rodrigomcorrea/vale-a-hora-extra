@@ -382,6 +382,22 @@ table.hol td.sub{color:var(--muted);font-size:.8rem}
       </div>
 
       <div class="panel">
+        <h2>Ida de carro (opcional)</h2>
+        <label class="check"><input type="checkbox" id="c-carro" data-k="carro"> <span>Vou de carro para a hora extra</span></label>
+        <div id="f-carro" class="stack" style="gap:12px">
+          <div class="row2">
+            <div class="field"><label for="c-carroKm">Distância ida e volta (km)</label><input type="number" id="c-carroKm" data-k="carroKm" min="0" step="0.1" inputmode="decimal"></div>
+            <div class="field"><label for="c-carroComb">Combustível</label>
+              <select id="c-carroComb" data-k="carroComb"><option value="gasolina">Gasolina</option><option value="etanol">Etanol</option></select></div>
+            <div class="field"><label for="c-carroConsumo">Consumo do carro (km por litro)</label><input type="number" id="c-carroConsumo" data-k="carroConsumo" min="0" step="0.1" inputmode="decimal"></div>
+            <div class="field"><label for="c-carroPreco">Preço do litro (R$)</label><input type="number" id="c-carroPreco" data-k="carroPreco" min="0" step="0.01" inputmode="decimal"></div>
+          </div>
+          <div class="field"><label for="c-carroOutros">Estacionamento e pedágio por dia (R$)</label><input type="number" id="c-carroOutros" data-k="carroOutros" min="0" step="0.01" inputmode="decimal"></div>
+          <span class="hint" id="carro-calc"></span>
+        </div>
+      </div>
+
+      <div class="panel">
         <h2>Descontos</h2>
         <div class="row2">
           <div class="field"><label for="c-dependentes">Dependentes no IR</label><input type="number" id="c-dependentes" data-k="dependentes" min="0" step="1"></div>
@@ -522,6 +538,7 @@ const DEF = {
   uf:"", cidade:"", sabadoUtil:false, iniJornada:"08:00", fimJornada:"17:00", iniFds:"08:00", fimFds:"14:00",
   pctUtil:50, pctSab:50, pctDom:100, pctFer:100, adNot:20, horaReduzida:true, prorrogNot:true, dsr:true,
   adicional:"", fechamento:0, bancoHoras:false,
+  carro:false, carroKm:0, carroComb:"gasolina", carroConsumo:0, carroPreco:0, carroOutros:0,
   dependentes:0, pensao:0, vt:false, vtCusto:0, plano:0,
   descontosExtras:[], custom:[], exemplo:true
 };
@@ -736,6 +753,14 @@ function valorDoDia(d){
 }
 
 const podeTrocar = kind => kind==="domingo" || kind==="feriado";
+/* Gasto de carro numa ida e volta: combustível + estacionamento/pedágio */
+function custoViagem(){
+  const c=S.cfg; if(!c.carro) return 0;
+  const comb = +c.carroConsumo>0 ? (+c.carroKm||0)/c.carroConsumo*(+c.carroPreco||0) : 0;
+  return comb + (+c.carroOutros||0);
+}
+/* Dia útil: a pessoa já iria trabalhar, então só conta se ela marcar */
+const vaiDeCarro = d => S.cfg.carro && ((S.plan[d]||{}).carro ?? tipoDia(d).kind!=="util");
 /* Falta sem justificativa: desconta o dia e o DSR da semana (Lei 605/49, art. 6º) */
 const semanaDe = d => { const {y,m,d:dd}=parseIso(d); return isoDt(addDias(new Date(Date.UTC(y,m,dd)), -dowOf(y,m,dd))); };
 
@@ -758,14 +783,17 @@ function calcMes(y,m){
     const fs = folha(sem, sem*fDSR, vf);
     it.bruto = it.valor*(1+fDSR);
     it.liq = full.liquido - fs.liquido;
-    it.ret = it.bruto>0 ? it.liq/it.bruto : 1;
+    it.carro = vaiDeCarro(it.d) ? custoViagem() : 0;
+    it.sobra = it.liq - it.carro;
+    it.ret = it.bruto>0 ? it.sobra/it.bruto : 1;
     it.verd = it.bruto>0 ? veredito(it.ret) : "none";
   });
   // quanto sobraria de mais R$ 100 de extra
   const x = 100/(1+fDSR);
   const prox = folha(he+x,(he+x)*fDSR,vf).liquido - full.liquido;
   const fgts = .08*(he+he*fDSR);
-  return {y,m,dias,uteis,descansos,fDSR,he,dsr:he*fDSR,itens,faltas,fgts,base,full,prox,horas:itens.reduce((s,i)=>s+i.h.relogio,0)};
+  const carro = itens.reduce((s,i)=>s+i.carro,0);
+  return {y,m,dias,uteis,descansos,fDSR,he,dsr:he*fDSR,itens,faltas,fgts,carro,base,full,prox,horas:itens.reduce((s,i)=>s+i.h.relogio,0)};
 }
 /* Dias marcados do mês que está na tela: com fechamento, o fim do mês já cai no holerite seguinte */
 function porDiaVisivel(y,m){
@@ -888,7 +916,7 @@ function preencherCfg(){
   document.querySelectorAll("[data-k]").forEach(el=>{
     const k=el.dataset.k, v=S.cfg[k];
     if(el.type==="checkbox") el.checked=!!v;
-    else el.value = (["salario","valorHora","vtCusto","fechamento"].includes(k) && !v) ? "" : v;
+    else el.value = (["salario","valorHora","vtCusto","fechamento","carroKm","carroConsumo","carroPreco","carroOutros"].includes(k) && !v) ? "" : v;
   });
   fillCidades(); renderDesc();
 }
@@ -947,6 +975,11 @@ function renderCfgDyn(){
     ? `Sua hora normal vale ${brl(valorHora())}.`
     : `Seu salário base fica em ${brl(salarioMensal())} por mês.`;
   if(valorHora()>0 && salarioMensal()<SAL_MIN) $("hora-calc").textContent += ` Atenção: isso fica abaixo do salário mínimo (${brl(SAL_MIN)}). Confira o valor${c.modo==="hora"?" da hora no holerite":""}.`;
+  $("f-carro").hidden = !c.carro;
+  const viagem=custoViagem();
+  $("carro-calc").textContent = !(+c.carroKm) || !(+c.carroConsumo) || !(+c.carroPreco)
+    ? "Preencha a distância, o consumo e o preço do litro. Esse gasto é tirado do que sobra de cada dia de hora extra."
+    : `Cada ida e volta gasta ${(c.carroKm/c.carroConsumo).toLocaleString("pt-BR",{maximumFractionDigits:1})} litros de ${c.carroComb}: ${brl(viagem)} por dia${+c.carroOutros?", já com estacionamento e pedágio":""}. Entra nos sábados, domingos, feriados e emendas; num dia útil você já iria trabalhar, então só conta se marcar no dia.`;
   $("adic-calc").textContent = adicionalMensal()
     ? `${brl(adicionalMensal())} por mês. Sua hora extra passa a ser calculada sobre ${brl(valorHoraHE())} por hora (Súmulas 132 e 139 do TST).`
     : "Esses adicionais também aumentam o valor da hora extra (Súmulas 132 e 139 do TST).";
@@ -1010,11 +1043,11 @@ $("cal").addEventListener("click",e=>{
 
 function renderStrip(calc){
   calc = calc || calcMes(S.y,S.m);
-  const extraB = calc.full.bruto - calc.base.bruto, extraL = calc.full.liquido - calc.base.liquido;
+  const extraB = calc.full.bruto - calc.base.bruto, extraL = calc.full.liquido - calc.base.liquido - calc.carro;
   $("strip").innerHTML = `
     <div><span class="eyebrow">Horas extras ${+S.cfg.fechamento?"de "+rotuloPeriodo(S.y,S.m):"em "+MESES[S.m]}</span><span class="v">${fmtH(calc.horas)}</span><span class="small muted">${calc.itens.length} ${calc.itens.length===1?"dia":"dias"}</span></div>
     <div><span class="eyebrow">Extra bruto (com DSR)</span><span class="v">${brl(extraB)}</span></div>
-    <div><span class="eyebrow">Fica no seu bolso</span><span class="v">${brl(extraL)}</span><span class="small muted">${extraB?pctf(extraL/extraB)+" do extra":"—"}</span></div>
+    <div><span class="eyebrow">Fica no seu bolso</span><span class="v">${brl(extraL)}</span><span class="small muted">${extraB?pctf(extraL/extraB)+" do extra":"—"}${calc.carro?` · já sem ${brl(calc.carro)} de carro`:""}</span></div>
     <div><span class="eyebrow">Líquido previsto</span><span class="v">${brl(calc.full.liquido)}</span><span class="small muted">sem extras: ${brl(calc.base.liquido)}</span></div>`;
 }
 
@@ -1057,6 +1090,7 @@ function renderEditor(calc){
     <div id="ed-form" ${on?"":"hidden"}>
       <div class="stack" style="gap:12px">
         ${podeTrocar(t.kind) ? `<label class="check"><input type="checkbox" id="ed-comp" ${p.comp?"checked":""}> <span>Vou ganhar uma folga em outro dia em troca deste</span></label>` : ""}
+        ${S.cfg.carro ? `<label class="check"><input type="checkbox" id="ed-carro" ${vaiDeCarro(d)?"checked":""}> <span>${util?"Vou fazer uma viagem de carro a mais por causa da extra":"Vou de carro neste dia"}</span></label>` : ""}
         ${util ? `
         <div class="row2">
           <div class="field"><label for="ed-ent">Vou entrar às</label><input type="time" id="ed-ent" value="${p.ent||""}"></div>
@@ -1129,6 +1163,7 @@ function renderEditor(calc){
   (util ? ["ed-ent","ed-sai","ed-pct"] : ["ed-ini","ed-fim","ed-pausa","ed-pct"]).forEach(id=>$(id).addEventListener("input",upd));
   $("ed-sug").addEventListener("click",()=>{ S.plan[d].pct=null; $("ed-pct").value=pctSugerido(tipoDia(d).kind); upd(); });
   if($("ed-comp")) $("ed-comp").addEventListener("change",e=>{ S.plan[d].comp=e.target.checked||undefined; save(); const c=calcMes(S.y,S.m); renderCalOnly(); renderStrip(c); renderPreview(c); });
+  if($("ed-carro")) $("ed-carro").addEventListener("change",e=>{ const padrao=!util; S.plan[d].carro = e.target.checked===padrao ? undefined : e.target.checked; save(); const c=calcMes(S.y,S.m); renderCalOnly(); renderStrip(c); renderPreview(c); });
   $("ed-rm").addEventListener("click",()=>{ const cur=S.plan[d]; ["on","ini","fim","pausa","pct","ent","sai","comp"].forEach(k=>delete cur[k]); clean(d); onChange(); });
 }
 function clean(d){ const p=S.plan[d]; if(p && !p.on && !p.dec && !p.ini && !p.ent && !p.falta) delete S.plan[d]; }
@@ -1173,7 +1208,8 @@ function renderPreview(calc){
     <div class="ln"><span>Bruto do dia</span><span class="num">${brl(it.valor)}</span></div>
     ${dsrTxt}
     <div class="ln"><span>Vai embora em INSS e IR</span><span class="num">− ${brl(it.bruto-it.liq)}</span></div>
-    <div class="verdict ${it.verd}"><span>${VERD_TXT[it.verd]}<br><span class="small" style="font-weight:500">Fica ${brl(it.liq)} · ${brl(it.liq/it.h.relogio)} por hora</span></span><span class="big">${pctf(it.ret)}</span></div>
+    ${it.carro ? `<div class="ln"><span>Carro ida e volta (${S.cfg.carroComb}${+S.cfg.carroOutros?", estacionamento e pedágio":""})</span><span class="num">− ${brl(it.carro)}</span></div>` : ""}
+    <div class="verdict ${it.verd}"><span>${VERD_TXT[it.verd]}<br><span class="small" style="font-weight:500">Fica ${brl(it.sobra)} · ${brl(it.sobra/it.h.relogio)} por hora</span></span><span class="big">${pctf(it.ret)}</span></div>
     <div class="ln"><span>Além disso, depósito no FGTS (8%)</span><span class="num">+ ${brl(it.bruto*.08)}</span></div>
     <p class="fine">A porcentagem mostra quanto deste dia fica com você, considerando os outros dias que já estão marcados no mês. O FGTS não entra no líquido, mas é dinheiro seu.${S.cfg.bancoHoras?" Como a empresa usa banco de horas, este dia pode virar folga em vez de pagamento.":""}</p>`;
 }
@@ -1192,6 +1228,7 @@ function renderHol(){
   const mesPag = MESES[(S.m+1)%12];
   const extras = [];
   if(extraB>0) extras.push(`Além do líquido, a empresa deposita <b class="num">${brl(c.fgts)}</b> no seu FGTS por causa das extras (8%). Se a hora extra for frequente, ela também aumenta o 13º e as férias.`);
+  if(c.carro>0) extras.push(`Indo de carro, você gasta <b class="num">${brl(c.carro)}</b> com ${cfg.carroComb}${+cfg.carroOutros?", estacionamento e pedágio":""} nos dias de extra. Tirando isso, sobram <b class="num">${brl(extraL-c.carro)}</b> das horas extras.`);
   if(cfg.bancoHoras) extras.push(`Sua empresa usa banco de horas: as horas marcadas podem virar folga em vez de dinheiro. Os valores mostram quanto elas valeriam se fossem pagas.`);
   $("hol-top").innerHTML = `
     <div class="eyebrow">Horas de ${rotuloPeriodo(S.y,S.m)} · normalmente pagas ${+cfg.fechamento?`no holerite de ${MESES[S.m]}, no começo de ${mesPag}`:`no holerite de ${mesPag}`}</div>
@@ -1259,7 +1296,7 @@ function renderHol(){
   }
   dica += c.itens.length ? `<p class="reco small">Se fizer mais R$ 100 de extra este mês, ficariam <b class="num">${brl(c.prox)}</b> com você.</p>` : "";
   const lista = c.itens.length ? `<ul class="days">${c.itens.map(i=>{ const {d:dd}=parseIso(i.d);
-    return `<li data-go="${i.d}"><span class="dot ${i.verd}"></span><span><b>${DOW_CURTO[i.t.w]} ${dd}</b> · ${fmtH(i.h.relogio)} a ${i.pct}%<br><span class="small muted">${VERD_TXT[i.verd]} · fica ${brl(i.liq)} de ${brl(i.bruto)}</span></span><span class="num">${pctf(i.ret)}</span></li>`; }).join("")}</ul>` : "";
+    return `<li data-go="${i.d}"><span class="dot ${i.verd}"></span><span><b>${DOW_CURTO[i.t.w]} ${dd}</b> · ${fmtH(i.h.relogio)} a ${i.pct}%<br><span class="small muted">${VERD_TXT[i.verd]} · fica ${brl(i.sobra)} de ${brl(i.bruto)}${i.carro?" (já sem o carro)":""}</span></span><span class="num">${pctf(i.ret)}</span></li>`; }).join("")}</ul>` : "";
   $("hol-reco").innerHTML = `<h3>Vale a pena?</h3>${reco}${dica}${lista}`;
 
   // Régua de faixas de IR
